@@ -1,3 +1,6 @@
 .vscode
 credentials.json
 dracli
+viewer.jnlp
+.DS_Store
+drac

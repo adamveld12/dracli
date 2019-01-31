@@ -1,5 +1,11 @@
 # DRACLI
 
+[![GoDoc](https://godoc.org/github.com/adamveld12/dracli?status.svg)](http://godoc.org/github.com/adamveld12/dracli)
+[![Go Walker](http://gowalker.org/api/v1/badge)](https://gowalker.org/github.com/adamveld12/dracli)
+[![Gocover](http://gocover.io/_badge/github.com/adamveld12/dracli)](http://gocover.io/github.com/adamveld12/dracli)
+[![Go Report Card](https://goreportcard.com/badge/github.com/adamveld12/dracli)](https://goreportcard.com/report/github.com/adamveld12/dracli)
+[![Build Status](https://semaphoreci.com/api/v1/adamveld12/dracli/branches/master/badge.svg)](https://semaphoreci.com/adamveld12/dracli)
+
 A quick and dirty CLI/client library for the Integrated Dell Remote Access Controller v6.
 
 ## CLI Usage

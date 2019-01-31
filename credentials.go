@@ -6,11 +6,14 @@ import (
 	"os"
 )
 
+//Credential represents credentials for the credentials json
 type Credential struct {
 	Host      string
+	Username  string
 	AuthToken string
 }
 
+//LoadCredentials from a credentials json file
 func LoadCredentials(path string) (*Credential, error) {
 	fp := fmt.Sprintf("%s/credentials.json", path)
 	f, err := os.Open(fp)
@@ -28,6 +31,7 @@ func LoadCredentials(path string) (*Credential, error) {
 	return credential, nil
 }
 
+//SaveCredentials saves credentials to a json file
 func SaveCredentials(path string, c Credential) error {
 	f, err := os.Create(fmt.Sprintf("%s/credentials.json", path))
 	if err != nil {

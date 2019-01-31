@@ -12,11 +12,12 @@ import (
 
 var (
 	commands = map[string]func(map[string][]string) error{
-		"login":  loginAction,
-		"logout": logoutAction,
-		"power":  powerStateAction,
-		"query":  queryAction,
-		"help":   helpAction,
+		"login":   loginAction,
+		"logout":  logoutAction,
+		"console": consoleAction,
+		"power":   powerStateAction,
+		"query":   queryAction,
+		"help":    helpAction,
 	}
 
 	queryHelp = []Attribute{
@@ -60,7 +61,7 @@ var (
 )
 
 func main() {
-	c, err := ToCommand(os.Args[1:]...)
+	c, err := toCommand(os.Args[1:]...)
 	if err != nil {
 		log.Println(err)
 		os.Exit(-1)
@@ -172,6 +173,15 @@ func queryAction(args map[string][]string) error {
 	return nil
 }
 
+func consoleAction(args map[string][]string) error {
+	c, err := NewFromCredentials(".")
+	if err != nil || os.IsNotExist(err) {
+		return errors.New("you are already logged in")
+	}
+
+	return c.OpenConsole()
+}
+
 func loginAction(args map[string][]string) error {
 	u, ok1 := args["u"]
 	p, ok2 := args["p"]
@@ -236,17 +246,17 @@ func helpAction(args map[string][]string) error {
 	return nil
 }
 
-type Command struct {
+type command struct {
 	Name      string
 	Arguments map[string][]string
 }
 
-func ToCommand(args ...string) (Command, error) {
+func toCommand(args ...string) (command, error) {
 	if len(args) < 1 {
-		return Command{}, nil
+		return command{}, nil
 
 	}
-	c := Command{
+	c := command{
 		Name:      args[0],
 		Arguments: map[string][]string{},
 	}

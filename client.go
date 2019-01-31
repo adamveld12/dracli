@@ -14,6 +14,165 @@ import (
 	xj "github.com/basgys/goxml2json"
 )
 
+//Client is an http client that talks to the iDRAC
+type Client struct {
+	client    *http.Client
+	Username  string
+	AuthToken string
+	Host      string
+}
+
+func (c *Client) doHTTP(path, qs string, body io.Reader) (string, []*http.Cookie, error) {
+	method := "GET"
+	if strings.ContainsAny(qs, "set") {
+		method = "POST"
+	}
+
+	uri := fmt.Sprintf("https://%s/data/%s?%s", c.Host, path, qs)
+	req, _ := http.NewRequest(method, uri, body)
+	req.AddCookie(&http.Cookie{
+		Name:  "_appwebSessionId_",
+		Value: c.AuthToken,
+	})
+
+	res, err := c.client.Do(req)
+	if err != nil {
+		return "", nil, errors.New("could not make request")
+	}
+	defer res.Body.Close()
+
+	jsonData, err := xj.Convert(res.Body)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if res.StatusCode >= 300 || res.StatusCode < 200 {
+		return jsonData.String(), res.Cookies(), fmt.Errorf("got a non 200 status: %d", res.StatusCode)
+	}
+
+	return jsonData.String(), res.Cookies(), nil
+}
+
+//OpenConsole downloads the jnlp that opens the console
+func (c *Client) OpenConsole() error {
+	//https://192.168.0.228/viewer.jnlp(192.168.0.228@0@root@1548390931405)
+	uri := fmt.Sprintf("https://%s/viewer.jnlp(%s@0@%s@%d)", c.Host, c.Host, c.Username, time.Now().Unix())
+	req, _ := http.NewRequest("GET", uri, nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "_appwebSessionId_",
+		Value: c.AuthToken,
+	})
+	res, err := c.client.Do(req)
+
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return errors.New("bad status")
+	}
+
+	f, err := os.Create("./viewer.jnlp")
+	if err != nil {
+		return errors.New("could not download")
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, res.Body); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//SetPowerState changes the power state of the server (ie turn off or on)
+func (c *Client) SetPowerState(ps PowerState) (string, error) {
+	res, _, err := c.doHTTP("", fmt.Sprintf("set=pwState:%d", ps), nil)
+	return res, err
+}
+
+//SetBootOverride changes the boot override settings
+func (c *Client) SetBootOverride(bo BootDevice, bootOnce bool) (string, error) {
+	res, _, err := c.doHTTP("", fmt.Sprintf("set=vmBootOnce:%v,firstBootDevice:%d", bootOnce, bo), nil)
+	return res, err
+}
+
+//Query queries attributes and returns them to json
+func (c *Client) Query(ds ...Attribute) (string, error) {
+	bufs := bytes.NewBufferString("")
+	for idx, attr := range ds {
+		bufs.WriteString(string(attr))
+		if idx < len(ds)-1 {
+			bufs.WriteString(",")
+		}
+	}
+
+	res, _, err := c.doHTTP("", fmt.Sprintf("get=%s", bufs.String()), nil)
+	return res, err
+}
+
+//NewFromCredentials creates a new client from a credentials file at the specified path
+func NewFromCredentials(path string) (*Client, error) {
+	credential, err := LoadCredentials(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, errors.New("You should log in first")
+		}
+		return nil, err
+	}
+
+	c, err := NewClient(credential.Host, true)
+	if err != nil {
+		return nil, err
+	}
+	c.AuthToken = credential.AuthToken
+	c.Username = credential.Username
+
+	return c, nil
+}
+
+//NewClient creates a new Client
+func NewClient(host string, skipVerify bool) (*Client, error) {
+	c := &http.Client{
+		Timeout: time.Second * 5,
+		Transport: &http.Transport{
+			IdleConnTimeout: time.Second,
+
+			TLSHandshakeTimeout: time.Second * 5,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: skipVerify,
+			},
+		},
+	}
+	client := &Client{client: c, Host: host}
+	// err := client.Login(host, username, password)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	return client, nil
+}
+
+//Login sends a login http request to the iDRAC
+func (c *Client) Login(username, password string) (string, error) {
+	body := bytes.NewBufferString(fmt.Sprintf("user=%s&password=%s", username, password))
+	_, cookies, err := c.doHTTP("login", "", body)
+
+	if err != nil {
+		return "", err
+	}
+
+	for _, cookie := range cookies {
+		if cookie.Name == "_appwebSessionId_" {
+			c.AuthToken = cookie.Value
+			return cookie.Value, nil
+		}
+	}
+
+	return "", errors.New("could not find auth token in cookie")
+}
+
 var (
 	PowerStatus           = Attribute("pwState")
 	SystemDescription     = Attribute("sysDesc")
@@ -54,139 +213,25 @@ var (
 
 	PowerOff            = PowerState(0)
 	PowerOn             = PowerState(1)
-	NonMaskingInterrupt = PowerState(2)
-	GracefulShutdown    = PowerState(3)
-	ColdReboot          = PowerState(4)
-	WarmReboot          = PowerState(5)
-	NoOverride          = BootDevice(0)
-	PXE                 = BootDevice(1)
-	HardDrive           = BootDevice(2)
-	BIOS                = BootDevice(6)
-	VirtualCD           = BootDevice(8)
-	LocalSD             = BootDevice(16)
-	LocalCD             = BootDevice(5)
+	ColdReboot          = PowerState(2)
+	WarmReboot          = PowerState(3)
+	NonMaskingInterrupt = PowerState(4)
+	GracefulShutdown    = PowerState(5)
+
+	NoOverride = BootDevice(0)
+	PXE        = BootDevice(1)
+	HardDrive  = BootDevice(2)
+	BIOS       = BootDevice(6)
+	VirtualCD  = BootDevice(8)
+	LocalSD    = BootDevice(16)
+	LocalCD    = BootDevice(5)
 )
 
+//Attribute is an attribute that can be queried
 type Attribute string
+
+//PowerState represents a powerstate option
 type PowerState uint8
+
+//BootDevice represents a bootdevice option
 type BootDevice uint8
-
-type SensorType struct {
-}
-
-type Client struct {
-	client    *http.Client
-	AuthToken string
-	Host      string
-}
-
-func (c *Client) doHTTP(path, qs string, body io.Reader) (string, []*http.Cookie, error) {
-	method := "GET"
-	if strings.ContainsAny(qs, "set") {
-		method = "POST"
-	}
-
-	uri := fmt.Sprintf("https://%s/data/%s?%s", c.Host, path, qs)
-	req, _ := http.NewRequest(method, uri, body)
-	req.AddCookie(&http.Cookie{
-		Name:  "_appwebSessionId_",
-		Value: c.AuthToken,
-	})
-
-	res, err := c.client.Do(req)
-	if err != nil {
-		return "", nil, errors.New("could not make request")
-	}
-	defer res.Body.Close()
-
-	jsonData, err := xj.Convert(res.Body)
-	if err != nil {
-		return "", nil, err
-	}
-
-	if res.StatusCode >= 300 || res.StatusCode < 200 {
-		return jsonData.String(), res.Cookies(), fmt.Errorf("got a non 200 status: %d", res.StatusCode)
-	}
-
-	return jsonData.String(), res.Cookies(), nil
-}
-
-func (c *Client) SetPowerState(ps PowerState) (string, error) {
-	res, _, err := c.doHTTP("", fmt.Sprintf("set=pwState:%d", ps), nil)
-	return res, err
-}
-
-func (c *Client) SetBootOverride(bo BootDevice, bootOnce bool) (string, error) {
-	res, _, err := c.doHTTP("", fmt.Sprintf("set=vmBootOnce:%v,firstBootDevice:%d", bootOnce, bo), nil)
-	return res, err
-}
-
-func (c *Client) Query(ds ...Attribute) (string, error) {
-	bufs := bytes.NewBufferString("")
-	for idx, attr := range ds {
-		bufs.WriteString(string(attr))
-		if idx < len(ds)-1 {
-			bufs.WriteString(",")
-		}
-	}
-
-	res, _, err := c.doHTTP("", fmt.Sprintf("get=%s", bufs.String()), nil)
-	return res, err
-}
-
-func NewFromCredentials(path string) (*Client, error) {
-	credential, err := LoadCredentials(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, errors.New("You should log in first")
-		}
-		return nil, err
-	}
-
-	c, err := NewClient(credential.Host, true)
-	if err != nil {
-		return nil, err
-	}
-	c.AuthToken = credential.AuthToken
-
-	return c, nil
-}
-
-func NewClient(host string, skipVerify bool) (*Client, error) {
-	c := &http.Client{
-		Timeout: time.Second * 5,
-		Transport: &http.Transport{
-			IdleConnTimeout: time.Second,
-
-			TLSHandshakeTimeout: time.Second * 5,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: skipVerify,
-			},
-		},
-	}
-	client := &Client{client: c, Host: host}
-	// err := client.Login(host, username, password)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	return client, nil
-}
-
-func (c *Client) Login(username, password string) (string, error) {
-	body := bytes.NewBufferString(fmt.Sprintf("user=%s&password=%s", username, password))
-	_, cookies, err := c.doHTTP("login", "", body)
-
-	if err != nil {
-		return "", err
-	}
-
-	for _, cookie := range cookies {
-		if cookie.Name == "_appwebSessionId_" {
-			c.AuthToken = cookie.Value
-			return cookie.Value, nil
-		}
-	}
-
-	return "", errors.New("could not find auth token in cookie")
-}
