@@ -8,6 +8,7 @@ import (
 
 type Credential struct {
 	Host      string
+	Username  string
 	AuthToken string
 }
 

@@ -12,11 +12,12 @@ import (
 
 var (
 	commands = map[string]func(map[string][]string) error{
-		"login":  loginAction,
-		"logout": logoutAction,
-		"power":  powerStateAction,
-		"query":  queryAction,
-		"help":   helpAction,
+		"login":   loginAction,
+		"logout":  logoutAction,
+		"console": consoleAction,
+		"power":   powerStateAction,
+		"query":   queryAction,
+		"help":    helpAction,
 	}
 
 	queryHelp = []Attribute{
@@ -170,6 +171,15 @@ func queryAction(args map[string][]string) error {
 	}
 
 	return nil
+}
+
+func consoleAction(args map[string][]string) error {
+	c, err := NewFromCredentials(".")
+	if err != nil || os.IsNotExist(err) {
+		return errors.New("you are already logged in")
+	}
+
+	return c.OpenConsole()
 }
 
 func loginAction(args map[string][]string) error {
