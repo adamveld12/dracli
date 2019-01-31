@@ -12,9 +12,10 @@ blocks:
         - name: APP_ENV
           value: prod
       jobs:
-      - name: Docker build
+      - name: build
         commands:
           - checkout
+          - make setup
           - make dev
 
   - name: "Vet"
@@ -23,9 +24,11 @@ blocks:
       - name: Test
         commands:
           - checkout
+          - make setup
           - echo "make test"
 
       - name: Lint code
         commands:
           - checkout
+          - make setup
           - echo "make lint"
