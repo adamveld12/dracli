@@ -6,18 +6,6 @@ agent:
     os_image: ubuntu1804
 
 blocks:
-  - name: "Build"
-    task:
-      env_vars:
-        - name: APP_ENV
-          value: prod
-      jobs:
-      - name: build
-        commands:
-          - checkout
-          - make setup
-          - make dev
-
   - name: "Vet"
     task:
       jobs:
@@ -32,3 +20,15 @@ blocks:
           - checkout
           - make setup
           - echo "make lint"
+
+  - name: "Build"
+    task:
+      env_vars:
+        - name: APP_ENV
+          value: prod
+      jobs:
+      - name: build
+        commands:
+          - checkout
+          - make setup
+          - make dev
