@@ -14,6 +14,7 @@ import (
 	xj "github.com/basgys/goxml2json"
 )
 
+//Client is an http client that talks to the iDRAC
 type Client struct {
 	client    *http.Client
 	Username  string
@@ -52,6 +53,7 @@ func (c *Client) doHTTP(path, qs string, body io.Reader) (string, []*http.Cookie
 	return jsonData.String(), res.Cookies(), nil
 }
 
+//OpenConsole downloads the jnlp that opens the console
 func (c *Client) OpenConsole() error {
 	//https://192.168.0.228/viewer.jnlp(192.168.0.228@0@root@1548390931405)
 	uri := fmt.Sprintf("https://%s/viewer.jnlp(%s@0@%s@%d)", c.Host, c.Host, c.Username, time.Now().Unix())
@@ -84,16 +86,19 @@ func (c *Client) OpenConsole() error {
 	return nil
 }
 
+//SetPowerState changes the power state of the server (ie turn off or on)
 func (c *Client) SetPowerState(ps PowerState) (string, error) {
 	res, _, err := c.doHTTP("", fmt.Sprintf("set=pwState:%d", ps), nil)
 	return res, err
 }
 
+//SetBootOverride changes the boot override settings
 func (c *Client) SetBootOverride(bo BootDevice, bootOnce bool) (string, error) {
 	res, _, err := c.doHTTP("", fmt.Sprintf("set=vmBootOnce:%v,firstBootDevice:%d", bootOnce, bo), nil)
 	return res, err
 }
 
+//Query queries attributes and returns them to json
 func (c *Client) Query(ds ...Attribute) (string, error) {
 	bufs := bytes.NewBufferString("")
 	for idx, attr := range ds {
@@ -107,6 +112,7 @@ func (c *Client) Query(ds ...Attribute) (string, error) {
 	return res, err
 }
 
+//NewFromCredentials creates a new client from a credentials file at the specified path
 func NewFromCredentials(path string) (*Client, error) {
 	credential, err := LoadCredentials(path)
 	if err != nil {
@@ -126,6 +132,7 @@ func NewFromCredentials(path string) (*Client, error) {
 	return c, nil
 }
 
+//NewClient creates a new Client
 func NewClient(host string, skipVerify bool) (*Client, error) {
 	c := &http.Client{
 		Timeout: time.Second * 5,
@@ -147,6 +154,7 @@ func NewClient(host string, skipVerify bool) (*Client, error) {
 	return client, nil
 }
 
+//Login sends a login http request to the iDRAC
 func (c *Client) Login(username, password string) (string, error) {
 	body := bytes.NewBufferString(fmt.Sprintf("user=%s&password=%s", username, password))
 	_, cookies, err := c.doHTTP("login", "", body)
@@ -219,6 +227,11 @@ var (
 	LocalCD    = BootDevice(5)
 )
 
+//Attribute is an attribute that can be queried
 type Attribute string
+
+//PowerState represents a powerstate option
 type PowerState uint8
+
+//BootDevice represents a bootdevice option
 type BootDevice uint8

@@ -61,7 +61,7 @@ var (
 )
 
 func main() {
-	c, err := ToCommand(os.Args[1:]...)
+	c, err := toCommand(os.Args[1:]...)
 	if err != nil {
 		log.Println(err)
 		os.Exit(-1)
@@ -246,17 +246,17 @@ func helpAction(args map[string][]string) error {
 	return nil
 }
 
-type Command struct {
+type command struct {
 	Name      string
 	Arguments map[string][]string
 }
 
-func ToCommand(args ...string) (Command, error) {
+func toCommand(args ...string) (command, error) {
 	if len(args) < 1 {
-		return Command{}, nil
+		return command{}, nil
 
 	}
-	c := Command{
+	c := command{
 		Name:      args[0],
 		Arguments: map[string][]string{},
 	}

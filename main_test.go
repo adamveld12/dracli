@@ -6,17 +6,17 @@ import (
 	"testing"
 )
 
-func Test_ToCommand(t *testing.T) {
+func Test_toCommand(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    string
-		want    Command
+		want    command
 		wantErr bool
 	}{
 		{
 			name: "login works",
 			args: "login -u root -p calvin 10.0.0.5",
-			want: Command{
+			want: command{
 				Name: "login",
 				Arguments: map[string][]string{
 					"u": []string{"root"},
@@ -29,7 +29,7 @@ func Test_ToCommand(t *testing.T) {
 		{
 			name: "boot settings",
 			args: "boot_settings -once local_cd",
-			want: Command{
+			want: command{
 				Name: "boot_settings",
 				Arguments: map[string][]string{
 					"once": []string{"true"},
@@ -41,7 +41,7 @@ func Test_ToCommand(t *testing.T) {
 		{
 			name: "query multi value",
 			args: "query pwState kvmEnabled voltages temperatures",
-			want: Command{
+			want: command{
 				Name: "query",
 				Arguments: map[string][]string{
 					"": []string{"pwState", "kvmEnabled", "voltages", "temperatures"},
@@ -53,13 +53,13 @@ func Test_ToCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := strings.Split(tt.args, " ")
-			got, err := ToCommand(args...)
+			got, err := toCommand(args...)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ToCommand() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("toCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ToCommand() = %v, want %v", got, tt.want)
+				t.Errorf("toCommand() = %v, want %v", got, tt.want)
 			}
 		})
 	}

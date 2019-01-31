@@ -1,0 +1,31 @@
+version: v1.0
+name: Drac Pipeline
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu1804
+
+blocks:
+  - name: "Build"
+    task:
+      env_vars:
+        - name: APP_ENV
+          value: prod
+      jobs:
+      - name: Docker build
+        commands:
+          - checkout
+          - make dev
+
+  - name: "Vet"
+    task:
+      jobs:
+      - name: Test
+        commands:
+          - checkout
+          - echo "make test"
+
+      - name: Lint code
+        commands:
+          - checkout
+          - echo "make lint"
